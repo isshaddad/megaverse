@@ -1,0 +1,14 @@
+{
+  "name": "megaverse",
+  "version": "1.0.0",
+  "description": "Crossmint Megaverse Challenge",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "phase1": "node index.js",
+    "reset": "node reset.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+}
