@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "phase1": "node index.js",
+    "phase2": "node index.js phase2",
     "reset": "node reset.js"
   },
   "dependencies": {
