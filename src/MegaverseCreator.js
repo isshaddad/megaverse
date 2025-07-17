@@ -118,10 +118,10 @@ class MegaverseCreator {
           const cell = map[row][col];
           if (cell === 'POLYANET') {
             astralObjects.push(new (require('./Polyanet'))(row, col));
-          } else if (cell.endsWith('SOLOON')) {
+          } else if (cell && cell.endsWith('SOLOON')) {
             const color = cell.split('_')[0].toLowerCase();
             astralObjects.push(new (require('./Soloon'))(row, col, color));
-          } else if (cell.endsWith('COMETH')) {
+          } else if (cell && cell.endsWith('COMETH')) {
             const direction = cell.split('_')[0].toLowerCase();
             astralObjects.push(new (require('./Cometh'))(row, col, direction));
           }
