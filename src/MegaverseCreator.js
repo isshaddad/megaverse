@@ -1,14 +1,20 @@
 const MegaverseAPI = require('./MegaverseAPI');
 const Polyanet = require('./Polyanet');
+const Logger = require('./utils/Logger');
+const { API, LOGGING } = require('../config');
 
 class MegaverseCreator {
   constructor() {
     this.api = new MegaverseAPI();
+    this.logger = new Logger(LOGGING.LEVEL);
   }
 
   async createPolyanetX(size = 11) {
+    this.logger.info(
+      `Starting Phase 1: Creating POLYanet X-shape on ${size}x${size} grid`
+    );
     const polyanets = this.generateXPattern(size);
-    await this.createAstralObjects(polyanets);
+    await this.createAstralObjects(polyanets, 'POLYanet X-shape');
   }
 
   generateXPattern(size) {
@@ -27,61 +33,198 @@ class MegaverseCreator {
       }
     }
 
+    this.logger.info(`Generated X-pattern with ${polyanets.length} POLYanets`);
     return polyanets;
   }
 
-  async createAstralObjects(astralObjects) {
-    for (const obj of astralObjects) {
+  async createAstralObjects(astralObjects, operationName = 'astral objects') {
+    const total = astralObjects.length;
+    this.logger.info(`Starting creation of ${total} ${operationName}`);
+
+    for (let i = 0; i < astralObjects.length; i++) {
+      const obj = astralObjects[i];
       const { row, column } = obj.getPosition();
-      await this.api.createPolyanet(row, column);
-      await this.delay(2000);
+
+      try {
+        if (obj.getType() === 'polyanet') {
+          await this.api.createPolyanet(row, column);
+        } else if (obj.getType() === 'soloon') {
+          await this.api.createSoloon(row, column, obj.color);
+        } else if (obj.getType() === 'cometh') {
+          await this.api.createCometh(row, column, obj.direction);
+        }
+
+        if (LOGGING.ENABLE_PROGRESS) {
+          const progress = (((i + 1) / total) * 100).toFixed(1);
+          this.logger.info(`Progress: ${progress}% (${i + 1}/${total})`);
+        }
+
+        await this.delay(API.RATE_LIMIT_DELAY);
+      } catch (error) {
+        this.logger.error(
+          `Failed to create ${obj.getType()} at (${row}, ${column})`,
+          { error: error.message }
+        );
+        throw error;
+      }
     }
-    console.log(`🌌 Created ${astralObjects.length} astral objects`);
+
+    this.logger.info(`Successfully created ${total} ${operationName}`);
   }
 
   async clearPolyanets(size = 11) {
+    this.logger.info(`Starting to clear POLYanets from ${size}x${size} grid`);
     const polyanets = this.generateXPattern(size);
-    for (const obj of polyanets) {
+
+    for (let i = 0; i < polyanets.length; i++) {
+      const obj = polyanets[i];
       const { row, column } = obj.getPosition();
-      await this.api.deletePolyanet(row, column);
-      await this.delay(2000);
+
+      try {
+        await this.api.deletePolyanet(row, column);
+
+        if (LOGGING.ENABLE_PROGRESS) {
+          const progress = (((i + 1) / polyanets.length) * 100).toFixed(1);
+          this.logger.info(
+            `Clear progress: ${progress}% (${i + 1}/${polyanets.length})`
+          );
+        }
+
+        await this.delay(API.RATE_LIMIT_DELAY);
+      } catch (error) {
+        this.logger.error(`Failed to delete POLYanet at (${row}, ${column})`, {
+          error: error.message,
+        });
+        throw error;
+      }
     }
-    console.log(`🗑️ Cleared ${polyanets.length} POLYanets`);
+
+    this.logger.info(`Successfully cleared ${polyanets.length} POLYanets`);
   }
 
   async buildFromGoalMap() {
-    const goal = await this.api.getGoalMap();
-    const map = goal.goal;
-    const size = map.length;
-    const astralObjects = [];
+    this.logger.info('Starting Phase 2: Building megaverse from goal map');
 
-    for (let row = 0; row < size; row++) {
-      for (let col = 0; col < size; col++) {
-        const cell = map[row][col];
-        if (cell === 'POLYANET') {
-          astralObjects.push(new (require('./Polyanet'))(row, col));
-        } else if (cell.endsWith('SOLOON')) {
-          const color = cell.split('_')[0].toLowerCase();
-          astralObjects.push(new (require('./Soloon'))(row, col, color));
-        } else if (cell.endsWith('COMETH')) {
-          const direction = cell.split('_')[0].toLowerCase();
-          astralObjects.push(new (require('./Cometh'))(row, col, direction));
+    try {
+      const goal = await this.api.getGoalMap();
+      const map = goal.goal;
+      const size = map.length;
+      const astralObjects = [];
+
+      this.logger.info(`Parsing goal map (${size}x${size})`);
+
+      for (let row = 0; row < size; row++) {
+        for (let col = 0; col < size; col++) {
+          const cell = map[row][col];
+          if (cell === 'POLYANET') {
+            astralObjects.push(new (require('./Polyanet'))(row, col));
+          } else if (cell.endsWith('SOLOON')) {
+            const color = cell.split('_')[0].toLowerCase();
+            astralObjects.push(new (require('./Soloon'))(row, col, color));
+          } else if (cell.endsWith('COMETH')) {
+            const direction = cell.split('_')[0].toLowerCase();
+            astralObjects.push(new (require('./Cometh'))(row, col, direction));
+          }
         }
       }
-    }
 
-    for (const obj of astralObjects) {
-      const { row, column } = obj.getPosition();
-      if (obj.getType() === 'polyanet') {
-        await this.api.createPolyanet(row, column);
-      } else if (obj.getType() === 'soloon') {
-        await this.api.createSoloon(row, column, obj.color);
-      } else if (obj.getType() === 'cometh') {
-        await this.api.createCometh(row, column, obj.direction);
-      }
-      await this.delay(2000);
+      this.logger.info(
+        `Parsed ${astralObjects.length} astral objects from goal map`
+      );
+      await this.createAstralObjects(
+        astralObjects,
+        'astral objects from goal map'
+      );
+    } catch (error) {
+      this.logger.error('Failed to build from goal map', {
+        error: error.message,
+      });
+      throw error;
     }
-    console.log('🌌 Finished building the megaverse from goal map!');
+  }
+
+  async clearAll() {
+    this.logger.info(
+      '🗑️ Starting comprehensive map reset - clearing all astral objects'
+    );
+
+    try {
+      const currentMap = await this.api.getGoalMap();
+      const map = currentMap.goal;
+      const size = map.length;
+
+      this.logger.info(
+        `Analyzing current map (${size}x${size}) to identify objects to clear`
+      );
+
+      let totalObjects = 0;
+      let deletedPolyanets = 0;
+      let deletedSoloons = 0;
+      let deletedComeths = 0;
+
+      //count objects
+      for (let row = 0; row < size; row++) {
+        for (let col = 0; col < size; col++) {
+          const cell = map[row][col];
+          if (cell && cell !== null) {
+            totalObjects++;
+          }
+        }
+      }
+
+      this.logger.info(`Found ${totalObjects} objects to clear`);
+
+      if (totalObjects === 0) {
+        this.logger.info('✅ Map is already empty');
+        return;
+      }
+
+      //delete objects
+      let processed = 0;
+      for (let row = 0; row < size; row++) {
+        for (let col = 0; col < size; col++) {
+          const cell = map[row][col];
+
+          if (cell && cell !== null) {
+            try {
+              if (cell === 'POLYANET') {
+                await this.api.deletePolyanet(row, col);
+                deletedPolyanets++;
+              } else if (cell.endsWith('SOLOON')) {
+                await this.api.deleteSoloon(row, col);
+                deletedSoloons++;
+              } else if (cell.endsWith('COMETH')) {
+                await this.api.deleteCometh(row, col);
+                deletedComeths++;
+              }
+
+              processed++;
+              if (LOGGING.ENABLE_PROGRESS) {
+                const progress = ((processed / totalObjects) * 100).toFixed(1);
+                this.logger.info(
+                  `Clear progress: ${progress}% (${processed}/${totalObjects})`
+                );
+              }
+
+              await this.delay(API.RATE_LIMIT_DELAY);
+            } catch (error) {
+              this.logger.warn(
+                `Failed to delete object at (${row}, ${col}): ${error.message}`
+              );
+            }
+          }
+        }
+      }
+
+      this.logger.info(
+        `✅ Map reset completed! Deleted: ${deletedPolyanets} POLYanets, ${deletedSoloons} SOLoons, ${deletedComeths} ComETHs`
+      );
+    } catch (error) {
+      this.logger.error('Failed to clear all objects', {
+        error: error.message,
+      });
+      throw error;
+    }
   }
 
   delay(ms) {
