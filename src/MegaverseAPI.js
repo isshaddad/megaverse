@@ -121,6 +121,21 @@ class MegaverseAPI {
     }, 'Get goal map');
   }
 
+  async getCurrentMap() {
+    return this.retryHandler.executeWithRetry(async () => {
+      try {
+        const response = await this.axiosInstance.get(
+          `${this.baseURL}/map/${this.candidateId}`
+        );
+        this.logger.info('Successfully fetched current map');
+        return response.data;
+      } catch (error) {
+        this.handleApiError(error, 'getCurrentMap');
+        throw error;
+      }
+    }, 'Get current map');
+  }
+
   async deleteSoloon(row, column) {
     return this.retryHandler.executeWithRetry(async () => {
       try {

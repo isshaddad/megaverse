@@ -10,7 +10,7 @@ module.exports = {
 
   // Logging configuration
   LOGGING: {
-    LEVEL: 'info',
+    LEVEL: 'debug',
     ENABLE_PROGRESS: true,
   },
 

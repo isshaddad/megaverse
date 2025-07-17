@@ -7,9 +7,13 @@ async function reset() {
   const logger = new Logger(LOGGING.LEVEL);
 
   try {
-    logger.info('🗑️ Starting comprehensive megaverse map reset');
+    logger.info('🔍 Reset script started');
+    logger.info(`Arguments: ${process.argv.join(' ')}`);
+
+    logger.info('🗑️ Starting sequential megaverse map reset');
+    logger.info('About to call creator.clearAll()...');
     await creator.clearAll();
-    logger.info('✅ Comprehensive map reset completed successfully!');
+    logger.info('✅ Sequential map reset completed successfully!');
   } catch (error) {
     logger.error('❌ Error during reset', {
       error: error.message,

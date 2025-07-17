@@ -149,8 +149,13 @@ class MegaverseCreator {
     );
 
     try {
-      const currentMap = await this.api.getGoalMap();
-      const map = currentMap.goal;
+      const currentMap = await this.api.getCurrentMap();
+
+      if (!currentMap?.map?.content) {
+        throw new Error('Failed to get valid current map response');
+      }
+
+      const map = currentMap.map.content;
       const size = map.length;
 
       this.logger.info(
@@ -158,15 +163,11 @@ class MegaverseCreator {
       );
 
       let totalObjects = 0;
-      let deletedPolyanets = 0;
-      let deletedSoloons = 0;
-      let deletedComeths = 0;
 
       //count objects
       for (let row = 0; row < size; row++) {
         for (let col = 0; col < size; col++) {
-          const cell = map[row][col];
-          if (cell && cell !== null) {
+          if (map[row][col] && map[row][col] !== null) {
             totalObjects++;
           }
         }
@@ -187,23 +188,41 @@ class MegaverseCreator {
 
           if (cell && cell !== null) {
             try {
-              if (cell === 'POLYANET') {
+              // Try to delete all types since we don't know the exact structure
+              let deleted = false;
+
+              // Try POLYanet first
+              try {
                 await this.api.deletePolyanet(row, col);
-                deletedPolyanets++;
-              } else if (cell.endsWith('SOLOON')) {
-                await this.api.deleteSoloon(row, col);
-                deletedSoloons++;
-              } else if (cell.endsWith('COMETH')) {
-                await this.api.deleteCometh(row, col);
-                deletedComeths++;
+                deleted = true;
+              } catch (polyError) {
+                // If it's not a POLYanet, try SOLoon
+                try {
+                  await this.api.deleteSoloon(row, col);
+                  deleted = true;
+                } catch (soloonError) {
+                  // If it's not a SOLoon, try ComETH
+                  try {
+                    await this.api.deleteCometh(row, col);
+                    deleted = true;
+                  } catch (comethError) {
+                    this.logger.warn(
+                      `Failed to delete object at (${row}, ${col}) - tried all types`
+                    );
+                  }
+                }
               }
 
-              processed++;
-              if (LOGGING.ENABLE_PROGRESS) {
-                const progress = ((processed / totalObjects) * 100).toFixed(1);
-                this.logger.info(
-                  `Clear progress: ${progress}% (${processed}/${totalObjects})`
-                );
+              if (deleted) {
+                processed++;
+                if (LOGGING.ENABLE_PROGRESS) {
+                  const progress = ((processed / totalObjects) * 100).toFixed(
+                    1
+                  );
+                  this.logger.info(
+                    `Clear progress: ${progress}% (${processed}/${totalObjects})`
+                  );
+                }
               }
 
               await this.delay(API.RATE_LIMIT_DELAY);
@@ -216,9 +235,7 @@ class MegaverseCreator {
         }
       }
 
-      this.logger.info(
-        `✅ Map reset completed! Deleted: ${deletedPolyanets} POLYanets, ${deletedSoloons} SOLoons, ${deletedComeths} ComETHs`
-      );
+      this.logger.info(`✅ Map reset completed!`);
     } catch (error) {
       this.logger.error('Failed to clear all objects', {
         error: error.message,
